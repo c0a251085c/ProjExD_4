@@ -72,6 +72,8 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.state = "normal"
+        self.hyper_life = 0
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -99,7 +101,13 @@ class Bird(pg.sprite.Sprite):
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
-        screen.blit(self.image, self.rect)
+        # ハイパー状態の判定と画像変換を行う
+        if self.state == "hyper":
+            self.image = pg.transform.laplacian(self.image)
+            self.hyper_life -= 1
+            if self.hyper_life < 0:
+                self.state = "normal"
+        screen.blit(self.image, self.rect)    
 
 
 class Bomb(pg.sprite.Sprite):
@@ -340,6 +348,14 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+                
+            # 右Shiftキーで無敵状態発動
+            if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT:
+                if score.value > 100:
+                    score.value -= 100
+                    bird.state = "hyper"
+                    bird.hyper_life = 500
+                    
             if (
                 event.type == pg.KEYDOWN
                 and event.key == pg.K_RETURN
@@ -366,7 +382,8 @@ def main():
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
-
+            
+        # こうかとんと爆弾の衝突判定 
         if len(gravities) > 0:
             for emy in pg.sprite.groupcollide(
                 emys,
@@ -385,7 +402,11 @@ def main():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
         for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
-            life.num -= 1  # 爆弾に衝突したら残機数を1減算する
+            if bird.state == "hyper":
+                exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+                score.value += 1  # 1点アップ
+            else:
+                life.num -= 1  # 爆弾に衝突したら残機数を1減算する
             if life.num < 0:  # 残機数が0未満になったらゲームオーバー
                 bird.change_img(8, screen)  # こうかとん悲しみエフェクト
                 score.update(screen)
